@@ -1,0 +1,987 @@
+REPLACE VIEW PROD_NBR_VW.NB_RPT_DI_SRC_VW
+AS LOCKING ROW FOR ACCESS 
+(
+SELECT DISTINCT 	  A.APPL_ID
+											, A.HLDG_KEY
+											, A.TOT_RISK_AMT AS BEN_AMT
+											, ( ZEROIFNULL(COV.COV_ANNL_PREM) + ZEROIFNULL(COV.COV_ADTL_PREM) + ZEROIFNULL(K.APPL_1035_AS_PREM)) AS AGMT_TOT_ANNUAL_PREM_AMT
+											, K.GRD_PREM_IND AS GRADED_PREMIUM_POLICY 
+											, PREPAID_IND AS PREPAID_PREMIUM_IND
+											, APPL_SIGN_ST AS CNTR_JURISDICTION
+											, SLCT_AGY_d  AS AGENCY_SRC_SYS_PRTY_ID
+											, TRIM( MRG_ENT_NB ) AS MRG_AGENCY_SRC_SYS_PRTY_ID
+											, TOP_BL_IND AS MASTERS_GROUP_PARTICIPANT --DEFAULT FOR LIFE NO VALUE PROVIDED
+											, SCARAB_ID AS SOLICITING_AGT_SCARAB_ID 
+											, PRODUCER_ID AS SOLICITING_AGT_SRC_SYS_PRTY_ID
+											, COALESCE(PRDNM.SOLICITING_AGT_FULL_NM,HIERARCHY.PRD_NM) AS SOLICITING_AGT_FULL_NM
+											, HIER_USER_VW.SSN AS SOLICITING_AGT_GOVT_ID
+											, (CASE WHEN COALESCE(HIERARCHY.SOLICITING_AGT_TYP_CD,HIERARCHY.SOLICITING_AGT_TYP_CD,'CAS')<>'CAS' THEN 'Broker' ELSE 'Career' END) SOLICITING_AGT_TYP_CD
+											, GRP_NB AS GROUP_SRC_SYS_PRTY_ID 
+											, SUBSTRING(GRP_NB FROM 1 FOR 5) AS GROUP_SRC_SYS_PRTY_ID_5
+											, GRP_NM AS GROUP_FULL_NM  --DEFAULT FOR LIFE NO VALUE PROVIDED
+											,  MARKET AS ORGANIZATION_BUSINESS_TYPE_CD  --DEFAULT FOR LIFE NO VALUE PROVIDED
+											, UWRT_TYP AS UW_TYPE  
+											/*(CASE
+												           WHEN H.UW_LOG_IN_ID  LIKE ANY ('%x00%') THEN 'GSI' 
+												           WHEN APPL_TYP LIKE ANY ('%4875%') THEN 'GSI' 
+												           WHEN H.UW_LOG_IN_ID  NOT LIKE ANY ('%x00%') AND APPL_TYP NOT LIKE ANY ('%4875%') THEN 'FULLY U/W' 
+												END)  */ 
+												
+											, CASE
+															WHEN BINGO_FLG = 'Y' THEN 'BINGO'
+															WHEN BINGO_FLG = 'N' THEN 'NIGO'
+															ELSE ' '
+											  END AS BINGO_IND
+											, CAST(BINGO_FLG_DT AS DATE) AS BINGO_REVIEW_DATE
+											, APPL_TYP AS APPLICATION_TYPE_CD
+											, REPL_IND AS REPLACEMENT_INSURANCE_IND
+											, REPL_TYP AS REPLACEMENT_TYPE
+											, SRC_PROD_CD AS PROD_ID
+											, AGMT_FRM  AS PRODUCT_TYPE
+											, F.LST_NM AS INS_LAST_NAME
+											, F.FRST_NM AS INS_FIRST_NAME
+											, OCC_TYP_DESC AS OCCUPATION_CLASS  --DEFAULT FOR LIFE NO VALUE PROVIDED
+											, OCC_CLS_CD AS OCCUPATION_TYP_CD  --DEFAULT FOR LIFE NO VALUE PROVIDED
+											, GNDR_CD AS INS_GNDR_CD
+											, DOB AS INS_BRTH_DT
+											, INS_AG AS INS_AGE
+											, F.GOVT_ID AS INS_GOVT_ID
+											, CAST(NULL AS VARCHAR(50) ) AS INS_ELEC_AD_TXT  --DEFAULT FOR LIFE NO VALUE PROVIDED
+											, RISK_CLS AS UNDERWRITER_CLASS_CD  --DEFAULT FOR LIFE NO VALUE PROVIDED
+											, RATED_IND AS RATED_IND
+											, CASE
+															WHEN XCLDE_IND='Y' THEN 'YES'
+															ELSE 'NO'
+											  END AS EXCLUSION_IND 
+											, H.UW_LOG_IN_ID AS UW_SRC_SYS_PRTY_ID 
+											, CASE
+															WHEN CHAR_LENGTH(TRIM(BOTH ' ' FROM UW_FRST_NM))>1  THEN UW_FRST_NM   || ' ' ||  UW_LST_NM
+															ELSE UW_LST_NM
+											  END AS UW_FULL_NM
+											, UW_TEAM_NM AS UW_TEAM_NM
+											, I.CM_LOG_IN_ID AS SPECIALIST_SRC_SYS_PRTY_ID
+											, CASE
+															WHEN CHAR_LENGTH(TRIM(BOTH ' ' FROM CM_FRST_NM))>1  THEN CM_FRST_NM   || ' ' ||  CM_LST_NM
+															ELSE CM_LST_NM
+											  END AS SPECIALIST_FULL_NM
+											, CAST(APPL_RCV_DT AS DATE) AS SUBMISSION_DATE
+											, CAST(COALESCE(APP_CAPTURE_DATE, APPL_ADE_DT) AS DATE) AS CARRIER_INPUT_DATE 
+											, COALESCE(APPL_RCVD_BY,CAST(NULL AS VARCHAR(20) )) AS CARRIER_SRC_SYS_PRTY_ID 
+											, CAST(NULL AS VARCHAR(30)) AS CARRIER_FULL_NM 
+											, CAST(COALESCE(TPP_INIT_RVW_STRT_DT,WR_INIT_RVW_STRT_DT) AS DATE) AS INIT_REVIEW_STRT_STUS_EVENT_DT  ----------------------------------Missing DATA for DI. We never requested it. Day2  addition
+											, CAST(COALESCE(TPP_INIT_RVW_END_DT, WR_INIT_RVW_END_DT) AS DATE) AS INIT_REVIEW_CMPL_STUS_EVENT_DT  ----------------------------------Missing DATA for DI. We never requested it. Day2  addition
+											, COALESCE(APPL_INIT_RVW_BY,CAST(NULL AS VARCHAR(20))) AS INITIAL_REVIEW_SRC_SYS_PRTY_ID 
+											, CAST(NULL AS VARCHAR(30)) AS INITIAL_REVIEWER_FULL_NM 
+											, CAST(ISSUE_DATE  AS DATE) AS ISSUE_DATE 
+											, COALESCE(APPL_ISS_BY,CAST(NULL AS VARCHAR(20))) AS ISSUED_BY_SRC_SYS_PRTY_ID 
+											, CAST(NULL AS VARCHAR(30)) AS ISSUED_BY_FULL_NM
+											, CAST(POSTPONE_DATE AS DATE) AS POSTPONE_STATUS_EVENT_DATE
+											, CAST(NULL AS VARCHAR(20)) AS POSTPONE_BY_SRC_SYS_PRTY_ID  
+											, CAST(NULL AS VARCHAR(30)) AS POSTPONED_BY_FULL_NM  
+											, CAST(DECLINE_DATE AS DATE) AS DECLINED_STATUS_EVENT_DATE
+											, COALESCE(APPL_DECL_BY,CAST(NULL AS VARCHAR(20) )) AS DECLINED_BY_SRC_SYS_PRTY_ID
+											, CAST(NULL AS VARCHAR(30)) AS DECLINED_BY_FULL_NM
+											, CAST(NOT_TAKEN_DATE AS DATE) AS NOT_TAKEN_STATUS_EVENT_DATE
+											, COALESCE(APPL_NOT_TAKEN_BY,CAST(NULL AS VARCHAR(20) )) AS NOT_TAKEN_BY_SRC_SYS_PRTY_ID
+                                            , CAST(NULL AS VARCHAR(30) ) AS NOT_TAKEN_BY_FULL_NM
+											, CAST(WITHDRAWN_DATE AS DATE) AS WITHDRAWN_STATUS_EVENT_DATE
+											, COALESCE(APPL_WITHDRWN_BY,CAST(NULL AS VARCHAR(20) )) AS WITHDRAWN_BY_SRC_SYS_PRTY_ID 
+											, CAST(NULL AS VARCHAR(30)) AS WITHDRAWN_FULL_NM 
+											, CAST(D.FIRST_FA_DATE AS DATE) AS FRST_FINL_ACTION_STUS_EVENT_DT
+											, FA_STUS AS FRST_FINAL_ACTION_DETAIL 
+											, COALESCE(APPL_APPV_BY,CAST(NULL AS VARCHAR(20))) AS FRST_FN_ACT_BY_SRC_SYS_PRTY_ID 
+											, CAST(NULL AS VARCHAR(30)) AS FRST_FINAL_ACTION_FULL_NM 
+											, CAST(APPL_INCMP_DT AS DATE) AS APPL_INCMP_EVENT_DT
+                        					, COALESCE(APPL_INCMP_BY,CAST(NULL AS VARCHAR(20))) AS APPL_INCMP_BY_SRC_SYS_PRTY_ID 
+                        					, CAST(NULL AS VARCHAR(30)) AS APPL_INCMP_BY_FULL_NM 
+											, CAST(STUS_DT AS DATE) AS CURR_STATUS_EVENT_DT
+											, CASE 
+													WHEN CAS_STUS_SHRT_DESC='Purge' then PURGE_STATUS 
+													WHEN RPT.ADMIN_TRANSACTION_DT IS NOT NULL  then 'Reported' 
+													ELSE CAS_STUS_SHRT_DESC  END AS CURR_STATUS_EVENT_DETAIL
+											, COALESCE(Y.DI_CURR_STUS_BY_ID,CAST(NULL AS VARCHAR(20))) AS CUR_STS_EVN_BY_SRC_SYS_PRTY_ID 
+											, COALESCE(Y.DI_CURR_STUS_BY_NAME, CAST(NULL AS VARCHAR(30))) AS CURR_STUS_EVENT_BY_FULL_NM 
+											, SRC_AGMT_STUS_CD AS CASE_STATUS_EVENT_DETAIL 
+											, CAST(STUS_DT AS DATE) AS CASE_STATUS_EVENT_DATE 
+											, T.TRANS_DT AS MAX_TRANS_DT
+											, ( 
+													CASE
+													When COALESCE(BROKERAGE_IND,'N')='N' and COALESCE(MARKET,'Indiv')='Indiv' and DISCOUNT_PCT < 10 Then (COV_ANNL_PREM * .50)									
+													When COALESCE(BROKERAGE_IND,'N')='N' and COALESCE(MARKET,'Indiv')='Indiv' and DISCOUNT_PCT = 10 Then (COV_ANNL_PREM * .40)	
+													When COALESCE(BROKERAGE_IND,'N')='N' and COALESCE(MARKET,'Worksite')='Indiv' and DISCOUNT_PCT > 10 Then (COV_ANNL_PREM * .40)				
+													When COALESCE(BROKERAGE_IND,'N')='N' and COALESCE(MARKET,'Worksite')='SmBiz' and DISCOUNT_PCT < 25 Then (COV_ANNL_PREM * .50)									
+													When COALESCE(BROKERAGE_IND,'N')='N' and COALESCE(MARKET,'Worksite')='SmBiz' and (DISCOUNT_PCT >= 25 and DISCOUNT_PCT<35) Then (COV_ANNL_PREM * .40)					
+													When COALESCE(BROKERAGE_IND,'N')='N' and COALESCE(MARKET,'Worksite')='SmBiz' and DISCOUNT_PCT >= 35 Then (COV_ANNL_PREM * .30)					
+													When COALESCE(BROKERAGE_IND,'N')='N' and COALESCE(MARKET,'Worksite')='Worksite' and DISCOUNT_PCT < 25 Then (COV_ANNL_PREM * .50)				
+													When COALESCE(BROKERAGE_IND,'N')='N' and COALESCE(MARKET,'Worksite')='Worksite' and (DISCOUNT_PCT >= 25 and DISCOUNT_PCT<35) Then (COV_ANNL_PREM * .40)				
+													When COALESCE(BROKERAGE_IND,'N')='N' and COALESCE(MARKET,'Worksite')='Worksite' and DISCOUNT_PCT >= 35 Then (COV_ANNL_PREM * .30)				
+													When COALESCE(BROKERAGE_IND,'N')='Y' and COALESCE(MARKET,'Indiv')='Indiv' and DISCOUNT_PCT < 10 then (ZEROIFNULL(COV_ANNL_PREM) * .50)
+													When COALESCE(BROKERAGE_IND,'N')='Y' and COALESCE(MARKET,'Indiv')='Indiv' and DISCOUNT_PCT = 10 then (ZEROIFNULL(COV_ANNL_PREM) * .45)											
+													When COALESCE(BROKERAGE_IND,'N')='Y' and COALESCE(MARKET,'Worksite')='Indiv' and DISCOUNT_PCT > 10 then (ZEROIFNULL(COV_ANNL_PREM) * .45)					
+													When COALESCE(BROKERAGE_IND,'N')='Y' and MARKET='SmBiz' and DISCOUNT_PCT < 25 Then (COV_ANNL_PREM * .50)									
+													When COALESCE(BROKERAGE_IND,'N')='Y' and MARKET='SmBiz' and (DISCOUNT_PCT >= 25 and DISCOUNT_PCT<35) Then (COV_ANNL_PREM * .35)					
+													When COALESCE(BROKERAGE_IND,'N')='Y' and MARKET='SmBiz' and DISCOUNT_PCT >= 35 Then (COV_ANNL_PREM * .25)					
+													When COALESCE(BROKERAGE_IND,'N')='Y' and MARKET='Worksite' and DISCOUNT_PCT < 25 Then (COV_ANNL_PREM * .50)				
+													When COALESCE(BROKERAGE_IND,'N')='Y' and MARKET='Worksite' and (DISCOUNT_PCT >= 25 and DISCOUNT_PCT<35) Then (COV_ANNL_PREM * .35)				
+													When COALESCE(BROKERAGE_IND,'N')='Y' and MARKET='Worksite' and DISCOUNT_PCT >= 35 Then (COV_ANNL_PREM * .25)		
+													END
+													) ESTIMATED_FYC
+											, CASE
+															WHEN CM_FLG = 'Y' THEN 'BINGO'
+															WHEN CM_FLG = 'N' THEN 'NIGO'
+															ELSE NULL
+											  END AS CM_BINGO_IND
+											, CASE
+															WHEN UW_FLG = 'Y' THEN 'BINGO'
+															WHEN UW_FLG = 'N' THEN 'NIGO'
+															ELSE NULL
+											  END AS UW_BINGO_IND
+											, CM_RSN_ADD_DT AS CM_BINGO_RVW_DT
+											, UW_RSN_ADD_DT AS UW_BINGO_RVW_DT
+											, RPT_PLCM_STUS
+											, RPT_INV_STUS
+											, CASE
+															WHEN APPL_TYP IN ('CNV', 'OPT') THEN 'CONVERSIONS'
+															ELSE  'NEW BUSINESS'
+											  END AS BUSS_TYP
+											, CAST(APPL_RPT_DT AS DATE) AS ISS_RPT_DT
+											, (ZEROIFNULL(COV.COV_ANNL_PREM) + (ZEROIFNULL(COV.COV_ADTL_PREM) + ZEROIFNULL(K.APPL_1035_AS_PREM))*0.10 ) AS WEIGHTED_ANNUAL_PREM_AMT
+											, COV.COV_ANNL_PREM  ANNL_PREM
+											, COV.COV_ADTL_PREM   COV_ADL_PREM
+											, APPL_1035_AS_PREM
+											, CASE
+													WHEN TRIM(BOTH FROM REPL_TYP) IN ('I','F','M','IR') THEN 'Internal'
+													WHEN TRIM(BOTH FROM REPL_TYP) IN ('E','X','N','ER') THEN 'External'
+													WHEN TRIM(BOTH FROM REPL_TYP) IN ('C','IRER') THEN 'Combination'
+													WHEN TRIM(BOTH FROM REPL_TYP) IN ('','NR') THEN  'Not a Replacement'
+													ELSE 'Not a Replacement'
+												END AS REPL_TYP_DESC
+											, HIERARCHY.SM_BKD_NM AS SALES_UNIT_MANAGER
+											,SRC_PROD_CD AS SRC_PROD_ID
+											,SRC_APPL_TYP AS SRC_APPLICATION_TYPE_CD
+											,SRC_SYS
+											,EZAPP_IND
+											,SIGN_METH
+											, HIERARCHY.SM_BKD_BP_ID AS SALES_MANAGER_UID 
+											,SIGND_DT as SIGNED_DT
+ 											,APS as APS_IND
+ 											,BLUE_CHIP					
+ 											,case 
+ 												when RPT.ADMIN_TRANSACTION_DT is not null  then RPT.ADMIN_TRANSACTION_DT 
+ 												when RPT.ADMIN_TRANSACTION_DT is null and CAST(APPL_RPT_DT AS DATE) is not null then CAST(APPL_RPT_DT AS DATE) 
+ 												end as INITIAL_PREM_DT
+ 												
+FROM   
+(
+SELECT DISTINCT			APPL.APPL_ID
+												, APPL.HLDG_KEY 
+												, COV_BENE_AMT
+												, CASE
+																WHEN PPD_IND IS NOT NULL THEN PPD_IND
+																ELSE 'N'
+												  END AS PREPAID_IND
+												, APPL_SIGN_ST
+												, CASE WHEN SLCT_AGY in ('000','N/A') then '000' 
+															  WHEN SLCT_AGY='999' then '999'
+												              WHEN cast(SLCT_AGY as INT) > 700 THEN 
+												                            CAST(LPAD(CAST((cast(SLCT_AGY as INT) - 700 ) as varchar(3) ), 3, '0' ) AS char(3))
+												              ELSE SLCT_AGY
+												              END AS SLCT_AGY_d
+													--	(SUBSTR('000',1,3-CHAR_LENGTH(TRIM(BOTH FROM(CAST(cast(SLCT_AGY as INT)-700 AS CHAR(3))))))||TRIM(BOTH FROM cast(SLCT_AGY as INT)-700) ) end) SLCT_AGY
+												, MRG_ENT_NB 
+												, TRIM( 'AA' || SUBSTR('000000' , 1 ,6-CHAR_LENGTH( TRIM(CAST(PRTY_ALT_ID.SRC_SYS_PRTY_ID AS INT ))) ) || TRIM( CAST( PRTY_ALT_ID.SRC_SYS_PRTY_ID AS INT ) ) ) PRODUCER_ID
+												 ,BPCOMP.SCARAB_ID SCARAB_ID
+												, APPL.APPL_DATA_FR_DT
+												, APPL.APPL_TYP
+												, APPL.APPL_SUBM_DT AS "SUBMIT DATE" 
+												, APPL.APPL_RCV_DT
+												, TOP_BL_IND 
+												, Z.ISSUE_DATE
+												, ISSUE_DATE_JOIN
+												, Z.DECLINE_DATE
+												, DECLINE_DATE_JOIN
+												, Z.NOT_TAKEN_DATE
+												, Z.WITHDRAWN_DATE
+												, WITHDRAWN_DATE_JOIN
+												, Z.FIRST_FA_DATE
+												, LST_STUS_DT
+												, FIRST_APPROVED_DATE
+												, LAST_APPROVED_DATE
+												, CASE_ID
+												, APP_CAPTURE_DATE
+												, AGMT_ST
+												, APPL.GRP_NB
+												, AGMT_STUS_CD  AS AGREEMENT_STATUS_CODE
+												, AGMT_STUS_DT AS STUS_DT
+												, TOT_RISK_AMT
+												, COV_ADL_PREM
+												, COV_MDL_PREM
+												, AGT_TYP_CD
+												, CASE
+																WHEN AGMT_STUS_CD = 'AO' THEN APPL.APPL_OFFR_DT
+																ELSE APPL.APPL_APPV_DT 
+												  END AS APPROVED_DATE
+												, APPL.APPL_ADE_DT AS APPLICATION_SUBMIT_DATE
+												, APPL.SRC_PROD_CD PRODUCT_CODE
+												, BRKRG_IND AS BROKERAGE_IND
+												, CAS_STUS_SHRT_DESC
+												, PURGE_STATUS
+												, APPL.APPL_OFFR_DT
+												, REPL_IND
+												, NB_REPL_VW.REPL_TYP_CD REPL_TYP --added the logic because DI is not providing this information in NB_APPL
+												, APPL.PROD_CD
+												, INS_AG
+												, SRC_AGMT_FRM AGMT_FRM
+												, APPL.APPL_ISS_DT
+												, RISK_CLS
+												, RATED_IND
+												, FRST_STUS_DT
+												, BRKRG_IND
+												, APPL.APPL_RPT_DT
+												, Z.APPL_ADE_DT
+												, APPL.SRC_PROD_CD
+												, SRC_APPL_TYP
+												, 'DIPMS' SRC_SYS 
+												,case when  APPL.HLDG_KEY=EZAPP.HLDG_KEY then 'Y' else 'N' end AS EZAPP_IND
+ 											    ,SIGN_METH.SIGN_METH_TYP_CD_SHRT_DESC AS SIGN_METH
+ 											    ,APPL.APPL_SIGND_DT as SIGND_DT
+ 											    ,(case when APS.APPL_ID is not null then 'Y' else 'N' end) as APS
+ 											    ,(case when PDCR.BCC_START_DT is not null then 'Y' else 'N' end) BLUE_CHIP
+ 											    ,GRP_INFO_VW.GRP_NM GRP_NM --From GRP_INFO_VW   IS
+ 											    ,ZEROIFNULL(cast(DCNT_PCT as integer)) AS DISCOUNT_PCT
+												,SALES_CTG_CD
+												,MKT_CD
+												,CASE WHEN SALES_CTG_CD = 'WKST' THEN 'Worksite' ELSE PROD_CONV_VW.MKT END AS MARKET 
+												,OCC_CLS_CD 
+												,POL_STUS_BY
+												,Z.APPL_INCMP_DT
+												,XCLDE_IND
+												,RPT_PLCM_STUS_CD_VW.RPT_PLCM_STUS_SHRT_DESC AS RPT_PLCM_STUS
+												,RPT_INV_STUS_CD_VW.RPT_INV_STUS_SHRT_DESC AS RPT_INV_STUS
+												,APPL_RCVD_BY
+												,APPL_INIT_RVW_BY
+												,APPL_APPV_BY
+												,APPL_ISS_BY
+												,APPL_INCMP_BY
+												,APPL_DECL_BY
+												,APPL_NOT_TAKEN_BY
+												,APPL_WITHDRWN_BY
+												,APPL.SRC_AGMT_STUS_CD
+												,APPL.UWRT_TYP
+FROM  (
+         SELECT  APPL_ID, APPL_DATA_FR_DT, HLDG_KEY, HLDG_KEY_PFX, HLDG_KEY_SFX, CARR_ADMIN_SYS_CD
+                         , APPL_DATA_TO_DT, CAS_ID, SRC_ST_CD, AGMT_ST, AGMT_INIT_DT, AGMT_FRM, AGMT_ISS_DT
+                        , SRC_AGMT_STUS_CD, AGMT_STUS_CD, AGMT_STUS_DT, APPL_ADE_DT, APPL_SUBM_DT
+                        , APPL_SIGND_DT, APPL_RCV_DT, APPL_APPV_DT, APPL_DCLN_DT, APPL_OFFR_DT, APPL_ISS_DT
+                        , APPL_INCMP_DT, APPL_WDRW_DT, APPL_NOT_TAKEN_DT, APPL_RPT_DT, APPL_DLV_DT
+                        , APPL_FREE_LK_DT, APPL_TYP, SRC_APPL_SIGN_ST, APPL_SIGN_ST, E_SIGN_IND, PPD_IND
+                        , UWTR_IND, TOT_RISK_AMT, GRP_NB, SPLT_IND, SLCT_AGY, REPL_IND, REPL_TYP, APPL_RISC_CLS
+                        , EZ_APP_IND, TOP_BL_IND, BRKRG_IND, OWN_SAME_AS_INS_IND, PAY_SAME_AS_INS_OR_OWN_IND
+                        , DSGN_LANG, PROD_CD, SRC_SYS_ID, RUN_ID, UPDT_RUN_ID, TRANS_DT, SRC_DEL_IND, SRC_APPL_TYP
+                        , SRC_PROD_CD, RPT_PLCM_STUS_CD, RPT_INV_STUS_CD, UWRT_TYP, POL_STUS_BY, SRC_AGMT_FRM
+                        , GRP_INFO_STRT_DT, RJCT_RSN_CD, APPL_INIT_RVW_STRT_DT, APPL_INIT_RVW_END_DT
+                                                 
+            FROM    (     SELECT APPL_ID, APPL_DATA_FR_DT, HLDG_KEY, HLDG_KEY_PFX, HLDG_KEY_SFX, CARR_ADMIN_SYS_CD
+                                                 , APPL_DATA_TO_DT, CAS_ID, SRC_ST_CD, AGMT_ST, AGMT_INIT_DT, AGMT_FRM, AGMT_ISS_DT
+                                                 , SRC_AGMT_STUS_CD, AGMT_STUS_CD, AGMT_STUS_DT, APPL_ADE_DT, APPL_SUBM_DT
+                                                 , APPL_SIGND_DT, APPL_RCV_DT, APPL_APPV_DT, APPL_DCLN_DT, APPL_OFFR_DT, APPL_ISS_DT
+                                                 , APPL_INCMP_DT, APPL_WDRW_DT, APPL_NOT_TAKEN_DT, APPL_RPT_DT, APPL_DLV_DT
+                                                 , APPL_FREE_LK_DT, APPL_TYP, SRC_APPL_SIGN_ST, APPL_SIGN_ST, E_SIGN_IND, PPD_IND
+                                                 , UWTR_IND, TOT_RISK_AMT, GRP_NB, SPLT_IND, SLCT_AGY, REPL_IND, REPL_TYP, APPL_RISC_CLS
+                                                 , EZ_APP_IND, TOP_BL_IND, BRKRG_IND, OWN_SAME_AS_INS_IND, PAY_SAME_AS_INS_OR_OWN_IND
+                                                 , DSGN_LANG, PROD_CD, SRC_SYS_ID, RUN_ID, UPDT_RUN_ID, TRANS_DT, SRC_DEL_IND, SRC_APPL_TYP
+                                                 , SRC_PROD_CD, RPT_PLCM_STUS_CD, RPT_INV_STUS_CD, UWRT_TYP, POL_STUS_BY, SRC_AGMT_FRM
+                                                 , GRP_INFO_STRT_DT, RJCT_RSN_CD, APPL_INIT_RVW_STRT_DT, APPL_INIT_RVW_END_DT
+                                                 ,ROW_NUMBER() OVER(PARTITION BY APPL_ID ORDER BY APPL_DATA_FR_DT DESC)  rnk
+                                                 , MAX(APPL_DATA_FR_DT) OVER(PARTITION BY  APPL_ID) mx
+                                                 , MIN(APPL_DATA_FR_DT) OVER(PARTITION BY  APPL_ID) mn
+                    
+                                     FROM PROD_NBR_VW.NB_APPL_VW APPL           
+                                   WHERE APPL_ID IN (SELECT APPL_ID 
+                                                                             FROM PROD_NBR_VW.NB_APPL_VW
+                                                                          WHERE  SRC_SYS_ID = 77
+                                                                                 AND  SRC_AGMT_STUS_CD like 'PURGE%' 
+                                                                                 AND APPL_DATA_TO_DT = '9999-12-31 00:00:00.000000')
+        and 	APPL_TYP  IN ('NEWAPP','ADD', 'ALT', 'CNC', 'CNV', 'EXC', 'INC', 'OPT', 'ORW')
+		AND   APPL.SRC_SYS_ID=77  
+                                  ) SRC
+        WHERE ( rnk =2 ) OR (mx =mn)    
+       
+       UNION ALL
+        
+         SELECT  APPL_ID, APPL_DATA_FR_DT, HLDG_KEY, HLDG_KEY_PFX, HLDG_KEY_SFX, CARR_ADMIN_SYS_CD
+                         , APPL_DATA_TO_DT, CAS_ID, SRC_ST_CD, AGMT_ST, AGMT_INIT_DT, AGMT_FRM, AGMT_ISS_DT
+                        , SRC_AGMT_STUS_CD, AGMT_STUS_CD, AGMT_STUS_DT, APPL_ADE_DT, APPL_SUBM_DT
+                        , APPL_SIGND_DT, APPL_RCV_DT, APPL_APPV_DT, APPL_DCLN_DT, APPL_OFFR_DT, APPL_ISS_DT
+                        , APPL_INCMP_DT, APPL_WDRW_DT, APPL_NOT_TAKEN_DT, APPL_RPT_DT, APPL_DLV_DT
+                        , APPL_FREE_LK_DT, APPL_TYP, SRC_APPL_SIGN_ST, APPL_SIGN_ST, E_SIGN_IND, PPD_IND
+                        , UWTR_IND, TOT_RISK_AMT, GRP_NB, SPLT_IND, SLCT_AGY, REPL_IND, REPL_TYP, APPL_RISC_CLS
+                        , EZ_APP_IND, TOP_BL_IND, BRKRG_IND, OWN_SAME_AS_INS_IND, PAY_SAME_AS_INS_OR_OWN_IND
+                        , DSGN_LANG, PROD_CD, SRC_SYS_ID, RUN_ID, UPDT_RUN_ID, TRANS_DT, SRC_DEL_IND, SRC_APPL_TYP
+                        , SRC_PROD_CD, RPT_PLCM_STUS_CD, RPT_INV_STUS_CD, UWRT_TYP, POL_STUS_BY, SRC_AGMT_FRM
+                        , GRP_INFO_STRT_DT, RJCT_RSN_CD, APPL_INIT_RVW_STRT_DT, APPL_INIT_RVW_END_DT
+            FROM PROD_NBR_VW.NB_APPL_VW APPL           
+          WHERE APPL_ID IN (SELECT APPL_ID 
+                                                    FROM PROD_NBR_VW.NB_APPL_VW
+                                                    WHERE  SRC_SYS_ID = 77
+                                                    AND  SRC_AGMT_STUS_CD NOT  like 'PURGE%' 
+                                                    AND APPL_DATA_TO_DT = '9999-12-31 00:00:00.000000')      
+         AND  APPL_DATA_TO_DT = '9999-12-31 00:00:00.000000'                                                       
+         AND  	APPL_TYP  IN ('NEWAPP','ADD', 'ALT', 'CNC', 'CNV', 'EXC', 'INC', 'OPT', 'ORW')
+		AND   APPL.SRC_SYS_ID=77       
+        
+             ) APPL 
+       
+LEFT OUTER JOIN PROD_NATL_SALES_SUM_VW.ENT_VW 
+		ON		ENT_NB =SLCT_AGY_d
+		--(case when SLCT_AGY='000' then '000' else (SUBSTR('000',1,3-CHAR_LENGTH(TRIM(BOTH FROM(CAST(cast(SLCT_AGY as INT)-700 AS CHAR(3))))))||TRIM(BOTH FROM cast(SLCT_AGY as INT)-700) ) end)
+LEFT OUTER JOIN PROD_USIG_CMN_VW.CAS_STUS_CD_VW 
+		ON 		CAS_STUS_CD = AGMT_STUS_CD
+LEFT OUTER JOIN PROD_USIG_CMN_VW.PRODUCT_TRANSLATOR_VW 
+		ON		PROD_TYP_CDE = APPL.PROD_CD
+LEFT OUTER JOIN PROD_NBR_VW.PROD_CONV_VW
+		ON    APPL.SRC_PROD_CD=PROD_CONV_VW.PROD_CDE
+LEFT OUTER JOIN
+(
+SELECT		APPL_ID
+					, MIN(CAST(APPL_ISS_DT AS DATE)) AS ISSUE_DATE
+					, MIN(AGMT_ISS_DT) AS ISSUE_DATE_JOIN
+					, MIN(CAST(APPL_DCLN_DT AS DATE)) AS DECLINE_DATE
+					, MIN(APPL_DCLN_DT) AS  DECLINE_DATE_JOIN
+					, MIN(APPL_NOT_TAKEN_DT) AS NOT_TAKEN_DATE
+					, MIN(CAST(APPL_WDRW_DT AS DATE)) AS WITHDRAWN_DATE
+					, MIN(APPL_WDRW_DT) AS WITHDRAWN_DATE_JOIN
+					, MIN(APPL_APPV_DT) AS FIRST_FA_DATE
+					, MAX(AGMT_STUS_DT) AS LST_STUS_DT
+					, MIN(APPL_APPV_DT) AS FIRST_APPROVED_DATE
+					, MAX (APPL_APPV_DT) AS LAST_APPROVED_DATE
+					, MIN(CAS_ID) AS CASE_ID
+					, MIN(APPL_RCV_DT) AS APP_CAPTURE_DATE
+					, MIN(AGMT_STUS_DT) AS FRST_STUS_DT
+					, MIN(APPL_ADE_DT) AS APPL_ADE_DT
+					, MIN(APPL_INCMP_DT) AS APPL_INCMP_DT
+FROM PROD_NBR_VW.NB_APPL_VW
+WHERE SRC_SYS_ID=77
+GROUP BY 1
+) Z ON APPL.APPL_ID = Z.APPL_ID
+LEFT OUTER JOIN
+(
+SELECT		 
+						 APPL_ID
+						,COV_BENE_AMT
+						,PROD_CD
+						,COV_TYP
+						,PRTY_RLE
+						,COV_ANNL_PREM
+						,COV_MDL_PREM
+						,COV_ADTL_PREM COV_ADL_PREM
+						,SRC_RISK_CLS RISK_CLS
+						, TBAC_CLS
+						, INS_AG
+						, ISS_AG
+						, SRC_PROD_CD
+						, OCC_CLS_CD
+						, CASE WHEN RT_IND = 'Y' THEN 'YES' ELSE 'NO' END AS RATED_IND
+						 , XCLDE_IND
+FROM PROD_NBR_VW.NB_COV_RISK_VW
+WHERE COV_TYP = 'BASE' 
+		AND	COV_RISK_TO_DT  = '9999-12-31 00:00:00.000000'
+		AND 	SRC_PRTY_RLE  in ('1','primins')
+		AND SRC_SYS_ID=77
+		QUALIFY (RANK() OVER (PARTITION BY APPL_ID ORDER BY COV_RISK_FR_DT DESC))=1
+) B ON APPL.APPL_ID = B.APPL_ID
+
+LEFT OUTER JOIN
+(
+SELECT 
+APPL_ID, SCARAB_ID,AGT_TYP_CD
+FROM 
+PROD_NBR_VW.NB_BP_COMM_SPLT_VW 
+WHERE 
+	BP_COMM_SPLT_TO_DT =  '9999-12-31 00:00:00.000000'
+	AND 	SRC_AGT_TYP='Y'
+	AND SRC_SYS_ID=77
+QUALIFY (RANK() over (PARTITION BY APPL_ID ORDER BY BP_COMM_SPLT_FR_DT DESC))=1
+) BPCOMP on APPL.APPL_ID = BPCOMP.APPL_ID
+
+LEFT OUTER JOIN PROD_STND_PRTY_VW.PRTY_ALT_ID_VW PRTY_ALT_ID 
+									ON		TRIM(BPCOMP.SCARAB_ID) = TRIM(PRTY_ALT_ID.ALT_ID)
+									AND	PRTY_ALT_ID.ALT_ID_TYP_CD = 'SCARAB_ID'
+									AND	PRTY_ALT_ID.PRTY_ALT_ID_TO_DT = '9999-12-31 00:00:00.000000'
+									
+/* Iteration I5: Checks if Policy came through NBHUB */                                 
+
+LEFT OUTER JOIN  PROD_NBR_VW.NB_ESIGN_VW EZAPP
+ON APPL.HLDG_KEY=EZAPP.HLDG_KEY
+AND EZAPP.ESIGN_TO_DT= '9999-12-31 00:00:00.000000'
+
+LEFT OUTER JOIN PROD_USIG_CMN_VW.SIGN_METH_CD_VW SIGN_METH
+ON EZAPP.SIGN_METH=SIGN_METH.SIGN_METH_TYP_CD
+
+LEFT OUTER JOIN PROD_USIG_STND_VW.PDCR_DEMOGRAPHICS_VW PDCR
+on PRODUCER_ID= ('AA' || TRIM ( SUBSTR(PDCR.BUSINESS_PARTNER_ID , 5 , 6 ) ))
+
+LEFT OUTER JOIN ( SELECT distinct APPL_ID from PROD_NBR_VW.NB_REQ_VW R
+where 
+SRC_SYS_ID=77 and R.REQ_CD like '%APS%' 
+--and   R.REQ_TO_DT = '9999-12-31 00:00:00.000000' 
+)  APS
+on APPL.APPL_ID=APS.APPL_ID
+
+LEFT OUTER JOIN PROD_NBR_VW.NB_GRP_INFO_VW GRP_INFO_VW
+ON APPL.GRP_NB = GRP_INFO_VW.GRP_NB
+and GRP_INFO_VW.GRP_INFO_END_DT='9999-12-31 00:00:00.000000' 
+--AND APPL.GRP_INFO_STRT_DT = GRP_INFO_VW.GRP_INFO_STRT_DT
+
+LEFT OUTER JOIN PROD_NBR_VW.NB_REPL_VW  
+on APPL.APPL_ID=NB_REPL_VW.APPL_ID
+and REPL_TO_DT = '9999-12-31 00:00:00.000000' 
+and NB_REPL_VW.SRC_SYS_ID=77
+
+LEFT OUTER JOIN PROD_NBR_VW.NB_APPL_INIT_STUS_BY_VW
+on APPL.APPL_ID=NB_APPL_INIT_STUS_BY_VW.APPL_ID
+
+LEFT OUTER JOIN 	PROD_USIG_CMN_VW.RPT_INV_STUS_CD_VW
+		ON		APPL.RPT_INV_STUS_CD = RPT_INV_STUS_CD_VW.RPT_INV_STUS_CD
+		
+LEFT OUTER JOIN 	PROD_USIG_CMN_VW.RPT_PLCM_STUS_CD_VW
+		ON 		APPL.RPT_PLCM_STUS_CD = RPT_PLCM_STUS_CD_VW.RPT_PLCM_STUS_CD 
+
+LEFT OUTER JOIN 		
+(
+select   
+APPL_ID
+,APPL_RCV_DT
+,APPL_APPV_DT
+,APPL_DCLN_DT
+,APPL_ISS_DT
+,APPL_INCMP_DT
+,APPL_WDRW_DT
+,APPL_NOT_TAKEN_DT
+,APPL_RPT_DT 
+,SRC_AGMT_STUS_CD AS SRC_AGMT_STUS_CD_p
+ ,CASE    
+      WHEN   APPL_RCV_DT IS NULL AND APPL_APPV_DT IS NULL AND APPL_DCLN_DT IS NULL AND APPL_ISS_DT IS NULL
+                     AND APPL_INCMP_DT IS NULL AND APPL_WDRW_DT IS NULL AND APPL_NOT_TAKEN_DT IS NULL 
+                     AND APPL_RPT_DT IS NULL THEN NULL
+           
+      WHEN COALESCE(CAST(APPL_RPT_DT AS DATE) ,CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_RCV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))      
+                AND      COALESCE(CAST(APPL_RPT_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_APPV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))     
+                AND      COALESCE(CAST(APPL_RPT_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_DCLN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))     
+                AND      COALESCE(CAST(APPL_RPT_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_ISS_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))      
+                AND      COALESCE(CAST(APPL_RPT_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_INCMP_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))    
+                AND      COALESCE(CAST(APPL_RPT_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_WDRW_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))     
+                AND      COALESCE(CAST(APPL_RPT_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) THEN  'Reported'
+                                
+      WHEN   COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_RCV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))         
+                AND       COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_APPV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))     
+                AND       COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_DCLN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))     
+                AND       COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_ISS_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))      
+                AND       COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_INCMP_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))    
+                AND       COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_WDRW_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))     
+                AND       COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),CAST('0001-01-01' AS DATE)) >= COALESCE(CAST(APPL_RPT_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) THEN 'Not Taken, Not Paid'            
+
+     WHEN  COALESCE(CAST(APPL_ISS_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_RCV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_ISS_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_APPV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))  
+                AND       COALESCE(CAST(APPL_ISS_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_DCLN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_ISS_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_INCMP_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_ISS_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_WDRW_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_ISS_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_ISS_DT AS DATE),CAST('0001-01-01' AS DATE)) >= COALESCE(CAST(APPL_RPT_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) THEN 'Reported'            
+                                                                        
+     WHEN  COALESCE(CAST(APPL_APPV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_RCV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))  
+                AND       COALESCE(CAST(APPL_APPV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_DCLN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))  
+                AND       COALESCE(CAST(APPL_APPV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_ISS_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_APPV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_INCMP_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_APPV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_WDRW_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_APPV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_APPV_DT AS DATE),CAST('0001-01-01' AS DATE)) >= COALESCE(CAST(APPL_RPT_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) THEN  'Approved Pending Issue'
+
+
+     WHEN  COALESCE(CAST(APPL_DCLN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_RCV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_DCLN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_APPV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_DCLN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_ISS_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_DCLN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_INCMP_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_DCLN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_WDRW_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_DCLN_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_DCLN_DT AS DATE),CAST('0001-01-01' AS DATE)) >= COALESCE(CAST(APPL_RPT_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) THEN  'Declined'        
+                                                                
+      WHEN  COALESCE(CAST(APPL_WDRW_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_RCV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_WDRW_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_APPV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))   
+                AND       COALESCE(CAST(APPL_WDRW_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_DCLN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))     
+                AND       COALESCE(CAST(APPL_WDRW_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_ISS_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))      
+                AND       COALESCE(CAST(APPL_WDRW_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_INCMP_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))         
+                AND       COALESCE(CAST(APPL_WDRW_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))
+                AND       COALESCE(CAST(APPL_WDRW_DT AS DATE),CAST('0001-01-01' AS DATE)) >= COALESCE(CAST(APPL_RPT_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))  THEN  'Withdrawn'  
+
+     WHEN  COALESCE(CAST(APPL_INCMP_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_RCV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_INCMP_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_APPV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_INCMP_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_DCLN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_INCMP_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_ISS_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_INCMP_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_WDRW_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_INCMP_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_INCMP_DT AS DATE),CAST('0001-01-01' AS DATE)) >= COALESCE(CAST(APPL_RPT_DT AS DATE),
+                                CAST('0001-01-01' AS DATE))  THEN 'Incomplete'
+                                
+   WHEN  COALESCE(CAST(APPL_RCV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_APPV_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_RCV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_DCLN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND         COALESCE(CAST(APPL_RCV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_ISS_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_RCV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_INCMP_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_RCV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_WDRW_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_RCV_DT AS DATE),CAST('0001-01-01' AS DATE)) >=  COALESCE(CAST(APPL_NOT_TAKEN_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) 
+                AND       COALESCE(CAST(APPL_RCV_DT AS DATE),CAST('0001-01-01' AS DATE)) >= COALESCE(CAST(APPL_RPT_DT AS DATE),
+                                CAST('0001-01-01' AS DATE)) THEN 'Application Submitted'
+                                                                                                                                
+      END      PURGE_STATUS
+FROM       PROD_NBR_VW.NB_APPL_VW
+WHERE   SRC_SYS_ID =77 AND SRC_AGMT_STUS_CD LIKE '%PURGE'
+
+) PURGE
+on APPL.APPL_ID=PURGE.APPL_ID
+AND purge.SRC_AGMT_STUS_CD_p =APPL.SRC_AGMT_STUS_CD
+) A
+
+
+LEFT OUTER JOIN
+(
+SELECT 
+TRIM(LEADING '0' FROM HLDG_KEY) AS HLDG_KEY,
+MIN(ADMIN_TRANSACTION_DT) ADMIN_TRANSACTION_DT
+FROM PROD_USIG_STND_VW.AGMT_COMM_TXN_CMN_VW 
+WHERE 
+INITIAL_PREMIUM_CD ='INITIAL' AND FIRST_RENEWAL_YR_COMP_CD = 'FRSTYEAR'
+GROUP BY HLDG_KEY
+) RPT
+ON A.HLDG_KEY=RPT.HLDG_KEY
+
+LEFT OUTER JOIN
+(
+SELECT 	APPL_ID
+					, MIN (CAST(AGMT_STUS_DT AS DATE)) AS POSTPONE_DATE
+					, MIN(AGMT_STUS_DT) AS "POSTPONE DATE JOINED"
+FROM 	PROD_NBR_VW.NB_APPL_VW APP
+				, PROD_USIG_CMN_VW.CAS_STUS_CD_VW
+WHERE CAS_STUS_SHRT_DESC LIKE('INCOMP%') 
+		AND 	APP.AGMT_STUS_CD =CAS_STUS_CD_VW.CAS_STUS_CD
+		AND APP.SRC_SYS_ID=77
+GROUP BY 1
+) C 
+
+ON A.APPL_ID= C.APPL_ID
+
+LEFT OUTER JOIN
+(
+
+SELECT			APPL_ID
+						, MIN (CAST(AGMT_STUS_DT AS DATE)) AS FIRST_FA_DATE
+						, MIN(AGMT_STUS_DT) AS "FIRST FA DATE JOINED"
+						, CAS_STUS_SHRT_DESC AS FA_STUS
+						, AGMT_STUS_DT
+						
+FROM PROD_NBR_VW.NB_APPL_VW APP
+			, PROD_USIG_CMN_VW.CAS_STUS_CD_VW
+
+WHERE 
+            (
+                        CAS_STUS_SHRT_DESC LIKE ('APPROVED%') 
+                        OR CAS_STUS_SHRT_DESC LIKE('APVD%') 
+                        OR CAS_STUS_SHRT_DESC LIKE('DECLINED%') 
+                        OR CAS_STUS_SHRT_DESC LIKE('INCOMP%') 
+                        OR CAS_STUS_SHRT_DESC LIKE('WITHDRAWN%')
+                        OR CAS_STUS_SHRT_DESC LIKE('ISSUED%')
+            )
+AND APP.AGMT_STUS_CD =CAS_STUS_CD_VW.CAS_STUS_CD
+AND APP.SRC_SYS_ID=77
+
+GROUP BY 1,4,5
+
+QUALIFY ( ROW_NUMBER() OVER ( PARTITION BY APPL_ID ORDER BY AGMT_STUS_DT ASC )  = 1 )
+
+
+) D
+ 
+ON A.APPL_ID= D.APPL_ID
+
+
+LEFT OUTER JOIN
+(
+
+SELECT	      NB_PRTY_APPL_RLE_VW.APPL_ID
+						, PRTY.LST_NM 
+						, PRTY.FRST_NM
+						, DOB
+						, GNDR_CD
+						, GOVT_ID
+						, SNS			
+						, OCC_TYP_DESC	
+FROM PROD_NBR_VW.NB_APPL_PRTY_VW  PRTY INNER JOIN  PROD_NBR_VW.NB_PRTY_APPL_RLE_VW 
+ON PRTY.PRTY_ID = NB_PRTY_APPL_RLE_VW.PRTY_ID 
+AND  PRTY.PRTY_DATA_TO_DT = '9999-12-31 00:00:00.000000'
+AND NB_PRTY_APPL_RLE_VW.PRTY_APPL_TO_DT = '9999-12-31 00:00:00.000000'  
+AND NB_PRTY_APPL_RLE_VW.RLE='INSD' 
+AND NB_PRTY_APPL_RLE_VW.SRC_RLE IN ( '1','primins')
+AND NB_PRTY_APPL_RLE_VW.AD_TYP='RA' /* I3 Defect 250 */
+AND NB_PRTY_APPL_RLE_VW.SRC_SYS_ID=77
+
+) F  ON F.APPL_ID = A.APPL_ID
+
+LEFT OUTER JOIN
+(
+SELECT DISTINCT			A.APPL_ID
+												, CASE
+																WHEN A.SRC_SYS_ID IN (32,36)  AND CM_BINGO.CM_FLG ='N' 				AND UW_BINGO.UW_FLG = 'N' 			THEN 'N'
+																WHEN A.SRC_SYS_ID IN (32,36)  AND CM_BINGO.CM_FLG ='N' 				AND UW_BINGO.UW_FLG = 'Y' 			THEN 'N'
+																WHEN A.SRC_SYS_ID IN (32,36)  AND CM_BINGO.CM_FLG ='N' 				AND UW_BINGO.UW_FLG IS NULL 	THEN 'N'
+																WHEN A.SRC_SYS_ID IN (32,36)  AND CM_BINGO.CM_FLG ='Y'				AND UW_BINGO.UW_FLG = 'Y' 			THEN 'Y'
+																WHEN A.SRC_SYS_ID IN (32,36)  AND CM_BINGO.CM_FLG ='Y'				AND UW_BINGO.UW_FLG = 'N' 			THEN 'N'
+																WHEN A.SRC_SYS_ID IN (32,36)  AND CM_BINGO.CM_FLG ='Y' 				AND UW_BINGO.UW_FLG IS NULL 	THEN 'N'
+																WHEN A.SRC_SYS_ID IN (32,36)  AND CM_BINGO.CM_FLG IS NULL	AND UW_BINGO.UW_FLG = 'N' 			THEN 'N'
+																WHEN A.SRC_SYS_ID IN (32,36)  AND CM_BINGO.CM_FLG IS NULL	AND UW_BINGO.UW_FLG = 'Y' 			THEN 'N'
+																WHEN A.SRC_SYS_ID IN (77)  THEN UW_BINGO.UW_FLG
+																ELSE NULL
+												  END AS BINGO_FLG
+												, CM_BINGO.CM_FLG
+												, UW_BINGO.UW_FLG
+												, CM_BINGO.CM_RSN_ADD_DT
+												, UW_BINGO.UW_RSN_ADD_DT
+												,CASE   
+				                                                WHEN CM_BINGO.CM_RSN_ADD_DT > UW_BINGO.UW_RSN_ADD_DT THEN CM_BINGO.CM_RSN_ADD_DT
+				                                                WHEN CM_BINGO.CM_RSN_ADD_DT IS NULL AND  UW_BINGO.UW_RSN_ADD_DT IS NOT NULL THEN UW_BINGO.UW_RSN_ADD_DT
+				                                                WHEN UW_BINGO.UW_RSN_ADD_DT IS NULL AND CM_BINGO.CM_RSN_ADD_DT IS NOT NULL THEN CM_RSN_ADD_DT
+				                                                ELSE UW_BINGO.UW_RSN_ADD_DT
+												END AS BINGO_FLG_DT
+FROM 
+(
+SELECT		APPL_ID,SRC_SYS_ID
+FROM PROD_NBR_VW.NB_BINGO_VW
+WHERE BINGO_TO_DT = '9999-12-31 00:00:00.000000'
+AND NB_BINGO_VW.SRC_SYS_ID=77
+QUALIFY ( ROW_NUMBER() OVER ( PARTITION BY APPL_ID,SRC_SYS_ID ORDER BY RSN_ADD_DT ASC )  = 1 )
+) A
+
+LEFT OUTER JOIN 
+
+(
+SELECT			APPL_ID
+	                    , ROLE_TYP
+	                    , BINGO_FLG AS CM_FLG
+	                    , COALESCE(RSN_ADD_DT, BINGO_FR_DT) AS CM_RSN_ADD_DT
+FROM PROD_NBR_VW.NB_BINGO_VW
+WHERE BINGO_TO_DT = '9999-12-31 00:00:00.000000'
+AND ROLE_TYP = 'CM'
+AND NB_BINGO_VW.SRC_SYS_ID=77
+QUALIFY ( ROW_NUMBER() OVER ( PARTITION BY APPL_ID ORDER BY RSN_ADD_DT ASC )  = 1 )
+)  CM_BINGO ON A.APPL_ID = CM_BINGO.APPL_ID
+
+LEFT OUTER JOIN
+(
+SELECT			APPL_ID
+                        , ROLE_TYP
+                        , BINGO_FLG AS UW_FLG
+                        , COALESCE(RSN_ADD_DT, BINGO_FR_DT) AS UW_RSN_ADD_DT
+FROM PROD_NBR_VW.NB_BINGO_VW
+WHERE BINGO_TO_DT = '9999-12-31 00:00:00.000000'
+AND ROLE_TYP = 'UW'
+AND NB_BINGO_VW.SRC_SYS_ID=77
+QUALIFY ( ROW_NUMBER() OVER ( PARTITION BY APPL_ID ORDER BY RSN_ADD_DT ASC )  = 1 )
+) UW_BINGO ON A.APPL_ID = UW_BINGO.APPL_ID
+
+WHERE  BINGO_FLG IS NOT NULL
+
+) G  ON G.APPL_ID = A.APPL_ID
+
+LEFT OUTER JOIN
+(
+SELECT  		APPL_ID
+						, LOG_IN_ID AS UW_LOG_IN_ID 
+						, APPL_DATA_FR_DT
+						, NB_PRTY_CASE_OWN_VW.LST_NM AS UW_LST_NM
+						, NB_PRTY_CASE_OWN_VW.FRST_NM AS UW_FRST_NM
+						, NB_PRTY_CASE_OWN_VW.TEAM_CD AS UW_TEAM_CD
+						, TEAM_NM AS UW_TEAM_NM
+FROM  PROD_NBR_VW.NB_PRTY_CASE_OWN_VW 
+
+LEFT OUTER JOIN PROD_NBR_VW.XLS_TEAM_IDS_VW
+                                    ON XLS_TEAM_IDS_VW.MM_ID = NB_PRTY_CASE_OWN_VW.LOG_IN_ID
+                                   
+WHERE NB_PRTY_CASE_OWN_VW.USR_RLE_CD = 'UW' 
+AND NB_PRTY_CASE_OWN_VW.CASE_OWN_TO_DT =  '9999-12-31 00:00:00.000000'
+AND NB_PRTY_CASE_OWN_VW.SRC_SYS_ID=77
+
+) H ON A.APPL_ID=H.APPL_ID 
+
+LEFT OUTER JOIN
+(
+SELECT 		APPL_ID
+						, LOG_IN_ID AS CM_LOG_IN_ID
+						, APPL_DATA_FR_DT
+						, LST_NM AS CM_LST_NM
+						, FRST_NM AS CM_FRST_NM
+						, NB_PRTY_CASE_OWN_VW.TEAM_CD AS CM_TEAM_CD
+						, TEAM_CD_SHRT_DESC AS CM_TEAM_NM
+						, NB_PRTY_CASE_OWN_VW.USR_RLE_CD
+FROM  PROD_NBR_VW.NB_PRTY_CASE_OWN_VW 
+
+LEFT OUTER JOIN PROD_USIG_CMN_VW.USR_RLE_CD_VW
+		ON 		NB_PRTY_CASE_OWN_VW.USR_RLE_CD =USR_RLE_CD_VW.USR_RLE_CD 
+
+LEFT OUTER JOIN PROD_USIG_CMN_VW.TEAM_CD_VW 
+		ON 		TEAM_CD_VW.TEAM_CD = NB_PRTY_CASE_OWN_VW.TEAM_CD
+		
+WHERE NB_PRTY_CASE_OWN_VW.USR_RLE_CD = 'NBS' 
+AND NB_PRTY_CASE_OWN_VW.CASE_OWN_TO_DT =  '9999-12-31 00:00:00.000000' 
+AND NB_PRTY_CASE_OWN_VW.SRC_SYS_ID=77
+) I ON I.APPL_ID = A.APPL_ID
+
+LEFT OUTER JOIN
+(
+SELECT     APPL_ID 
+					, ANNL_PREM
+					, MDL_PREM
+					, BILL_TYP_CD
+					, BILL_FREQ_CD
+					, APPL_1035_AS_PREM
+					,GRD_PREM_IND
+FROM PROD_NBR_VW.NB_BILL_INFO_VW
+WHERE BILL_INFO_TO_DT='9999-12-31 00:00:00.000000'
+AND NB_BILL_INFO_VW.SRC_SYS_ID=77
+) K ON A.APPL_ID = K.APPL_ID
+
+LEFT OUTER JOIN
+(
+SELECT APPL_ID, XCLDE_TYP
+FROM PROD_NBR_VW.NB_UWRT_RISK_VW
+WHERE UWRT_RISK_TO_DT =  '9999-12-31 00:00:00.000000'
+AND XCLDE_TYP<>'UNK'
+AND NB_UWRT_RISK_VW.SRC_SYS_ID=77
+) M
+ON A.APPL_ID = M.APPL_ID 
+LEFT OUTER JOIN
+PROD_PDCR_HIER_VW.HIER_USER_VW ON HIER_USER_VW.UID = A.PRODUCER_ID
+and REC_END_DT = '9999-12-31 00:00:00.000000'
+
+LEFT OUTER JOIN 
+(
+SELECT  
+ 'AA' || SUBSTRING(BP_ID FROM 5 FOR 6) AS AA_NUM,
+(CASE
+WHEN TRIM(BOTH FROM UPPER(LST_NM)) <>''  AND TRIM(BOTH FROM UPPER(FRST_NM)) <>'' THEN (TRIM(BOTH FROM UPPER(LST_NM)) || ', ' || TRIM(BOTH FROM UPPER(FRST_NM)))
+ELSE TRIM(BOTH FROM UPPER(FULL_NM))
+END)AS SOLICITING_AGT_FULL_NM 
+
+FROM   PROD_STND_VW.PDCR_XREF_VW 
+LEFT OUTER JOIN PROD_STND_VW.BP_NM_VW 
+                                    ON PDCR_XREF_VW.PDCR_PRTY_ID = BP_NM_VW.PRTY_ID
+) PRDNM on PRDNM.AA_NUM=A.PRODUCER_ID
+
+LEFT OUTER JOIN
+(
+SELECT 		APPL_ID
+						, MIN(CRTE_DT) AS TPP_INIT_RVW_STRT_DT
+						, MIN(CPLT_DT) AS TPP_INIT_RVW_END_DT	
+FROM PROD_NBR_VW.NB_WRK_ITEM_VW
+WHERE SRC_WRK_ITEM_ID IN (1000051, 2000622, 2000621) 
+AND WRK_ITEM_TO_DT = '9999-12-31 00:00:00.000000'
+AND NB_WRK_ITEM_VW.SRC_SYS_ID=77
+GROUP BY 1
+) R
+ON R.APPL_ID = A.APPL_ID
+LEFT OUTER JOIN
+(
+SELECT 		APPL_ID
+						, MIN(REQ_ORDR_DT) AS WR_INIT_RVW_STRT_DT
+						, MIN(REQ_STUS_DT) AS WR_INIT_RVW_END_DT
+						
+FROM PROD_NBR_VW.NB_REQ_VW
+
+WHERE REQ_CD = 'MBRS' AND REQ_STUS_CD = 'REVIEWED'
+AND REQ_TO_DT = '9999-12-31 00:00:00.000000' 
+AND NB_REQ_VW.SRC_SYS_ID=77
+GROUP BY 1
+) S
+ON S.APPL_ID = A.APPL_ID
+LEFT OUTER JOIN
+(
+SELECT                DISTINCT APPL_ID
+FROM PROD_NBR_VW.NB_XCLDE_VW
+) U
+ON A.APPL_ID = U.APPL_ID
+
+LEFT OUTER JOIN
+(
+SELECT   
+		DISTINCT  STUS_OWN_ID AS DI_CURR_STUS_BY_ID
+                               , TRIM(BOTH FROM LST_NM) || ', ' ||  TRIM(BOTH FROM FRST_NM) AS DI_CURR_STUS_BY_NAME
+                  			   , APPL_ID
+FROM PROD_NBR_VW.NB_STUS_OWN_VW 
+LEFT OUTER JOIN PROD_NBR_VW.NB_PRTY_CASE_OWN_VW
+ON STUS_OWN_ID = LOG_IN_ID
+WHERE CASE_OWN_TO_DT =  '9999-12-31 00:00:00.000000' 
+) Y
+ON A.POL_STUS_BY = Y.DI_CURR_STUS_BY_ID AND A.APPL_ID = Y.APPL_ID
+
+LEFT OUTER JOIN 
+
+(
+SELECT                        APPL_ID 
+                                        , SUM(COV_ANNL_PREM) COV_ANNL_PREM
+                                        , SUM(COV_ADTL_PREM) COV_ADTL_PREM
+FROM PROD_NBR_VW.NB_COV_RISK_VW
+WHERE 
+ COV_RISK_TO_DT  = '9999-12-31 00:00:00.000000'
+and SRC_SYS_ID=77
+GROUP BY APPL_ID
+) COV ON A.APPL_ID = COV.APPL_ID
+
+
+/*		Hierarchy -- Get SM/BKD		*/
+
+LEFT OUTER JOIN 
+									(
+											SELECT	AGY_LGCY_ID 
+															, PRD_BPID
+															, PRD_NM
+															, SOLICITING_AGT_TYP_CD
+															, MAX(CASE WHEN ROW_NUM MOD 10 = 0 THEN SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 1 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 2 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 3 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 4 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 5 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 6 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 7 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 8 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 9 THEN ' / ' || SM_BKD_NM ELSE '' END) AS SM_BKD_NM
+															, MAX(CASE WHEN ROW_NUM MOD 10 = 0 THEN SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 1 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 2 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 3 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 4 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 5 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 6 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 7 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 8 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 9 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) AS SM_BKD_BP_ID
+											FROM
+											(
+											SELECT	AGY_LGCY_ID 
+															, PRD_BPID
+															, PRD_NM
+															, SOLICITING_AGT_TYP_CD
+															, ROW_NUM / 10 AS ROW_NUM
+															, MAX(CASE WHEN ROW_NUM MOD 10 = 0 THEN SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 1 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 2 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 3 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 4 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 5 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 6 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 7 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 8 THEN ' / ' || SM_BKD_NM ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 9 THEN ' / ' || SM_BKD_NM ELSE '' END) AS SM_BKD_NM
+															, MAX(CASE WHEN ROW_NUM MOD 10 = 0 THEN SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 1 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 2 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 3 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 4 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 5 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 6 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 7 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 8 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) ||
+															MAX(CASE WHEN ROW_NUM MOD 10 = 9 THEN ' / ' || SM_BKD_BP_ID ELSE '' END) AS SM_BKD_BP_ID
+											FROM
+											(
+															SEL	 DISTINCT 
+															  AGY_LGCY_ID
+															, SM_BKD_BP_ID
+															, CAST( TRIM( SM_BKD_NM ) AS VARCHAR(100) ) AS SM_BKD_NM
+															, PRD_NM
+															, PRD_BPID
+															, SOLICITING_AGT_TYP_CD
+															, ROW_NUMBER() OVER (PARTITION BY AGY_LGCY_ID, PRD_BPID ORDER BY SM_BKD_NM )-1 AS ROW_NUM
+															FROM (
+																					SEL  DISTINCT
+																					TRIM( AGY_LGCY_ID ) AS AGY_LGCY_ID 
+																					, 'AA' || TRIM ( SUBSTR( SM_BKD_BPID , 5 , 6 ) ) AS SM_BKD_BP_ID
+																					, SM_BKD_NM 
+																					, 'AA' || TRIM ( SUBSTR( PRD_BPID , 5 , 6 ) ) AS PRD_BPID
+																					, PRD_NM
+																					, max( CASE  --Direct Relationship to Agency Contract Type determines Producer Type
+																						WHEN PRD_DIRECT_TO_AGY_IND = 'D'  AND PRD_STD_CONTR_TYP IN ('Z201','Z204', 'Z205','Z206','Z207','Z208','Z209','Z210','Z212','Z284') THEN 'CAS' 
+																						ELSE 'CAB' 
+																					END ) over (partition by PRD_BPID) AS SOLICITING_AGT_TYP_CD
+																					FROM PROD_USIG_ACCESS_VW.SALES_HIERARCHY_VW 
+																					WHERE SM_BKD_BPID IS NOT NULL 
+																					--AND	PRD_RLE IN ( 'PRD' , 'CRP' )
+																					AND 	SM_BKD_STUS = 'ACTIVE'
+																					AND	PRD_UNT_STUS = 'ACTIVE'
+																					AND	PRD_UNT_REL_END_DT = '9999-12-31' -- for some reason even when the PRD_UNT_STUS is Active, there's PRD_UNT_REL_END_DT <> 9999-12-31
+																					--and     PRD_BPID = '0000551515'
+																					QUALIFY   ( ( SOLICITING_AGT_TYP_CD = 'CAS' AND PRD_DIRECT_TO_UNT_IND = 'D'  ) OR ( SOLICITING_AGT_TYP_CD = 'CAB' AND PRD_DIRECT_TO_UNT_IND IN ( 'D' , 'I' )  ) )
+																					GROUP BY 1,2,3,4,5,PRD_DIRECT_TO_AGY_IND,PRD_BPID,PRD_STD_CONTR_TYP
+																		) A
+											) Q1
+											GROUP BY 1,2,3,4,5
+											) Q2		
+											GROUP BY 1,2,3,4
+									) HIERARCHY
+									
+ON 		UPPER(PRODUCER_ID) = HIERARCHY.PRD_BPID 
+AND 	TRIM(MRG_ENT_NB)=TRIM(HIERARCHY.AGY_LGCY_ID)
+LEFT OUTER JOIN PROD_NBR_VW.NB_MAX_TRANS_DT_VW T
+ON 1 = 1
+);
